@@ -2,7 +2,7 @@
  * TrendZap Oracle — On-Chain Resolution Trigger
  * 
  * This module is responsible for fetching final metric values and
- * calling ViralityMarketV2.resolveMarket() on Avalanche.
+ * calling ViralityMarket.resolveMarket() on Avalanche.
  * 
  * Flow:
  * 1. BullMQ job fires when market.resolutionTime is reached
@@ -13,7 +13,7 @@
 
 import { createPublicClient, createWalletClient, http, parseAbi } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { avalancheFuji } from 'viem/chains';
+import { avalanche, avalancheFuji } from 'viem/chains';
 import { logger } from '../utils/logger';
 import { config } from '../config';
 
@@ -57,7 +57,7 @@ export async function resolveMarketOnChain(
   }
 
   const account = privateKeyToAccount(privateKey);
-  const chain = config.oracle?.chainId === 43114 ? avalancheFuji : avalancheFuji; // swap to mainnet when ready
+  const chain = config.oracle?.chainId === 43114 ? avalanche : avalancheFuji;
 
   const publicClient = createPublicClient({
     chain,
@@ -151,7 +151,7 @@ export async function isMarketResolvable(marketId: number): Promise<{
     return { resolvable: false, reason: 'Contract address not configured' };
   }
 
-  const chain = avalancheFuji;
+  const chain = config.oracle?.chainId === 43114 ? avalanche : avalancheFuji;
   const publicClient = createPublicClient({
     chain,
     transport: http(config.oracle?.rpcUrl || 'https://api.avax-test.network/ext/bc/C/rpc'),
