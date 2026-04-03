@@ -291,7 +291,7 @@ docker-compose up -d
 
 ## Chainlink Node Setup
 
-1. Deploy Chainlink node on Arbitrum
+1. Deploy Chainlink node on Avalanche
 2. Add external adapter bridge pointing to this service
 3. Create job spec using the templates in `chainlink-jobs/`
 4. Configure the `SocialOracle` contract with job ID

@@ -6,9 +6,11 @@ import { metricsRoutes } from './api/routes/metrics';
 import { chainlinkRoutes } from './api/routes/chainlink';
 import { healthRoutes } from './api/routes/health';
 import { logger } from './utils/logger';
+import { createResolutionWorker } from './workers/resolutionWorker';
+import { scheduleRoutes } from './api/routes/schedule';
 
 const app = Fastify({
-  logger: logger,
+  logger: logger as any,
 });
 
 // Register plugins
@@ -25,12 +27,27 @@ await app.register(rateLimit, {
 await app.register(healthRoutes, { prefix: '/api/v1' });
 await app.register(metricsRoutes, { prefix: '/api/v1' });
 await app.register(chainlinkRoutes, { prefix: '/api/v1' });
+await app.register(scheduleRoutes, { prefix: '/api/v1' });
+
+// Start the BullMQ resolution worker
+const worker = createResolutionWorker();
+logger.info('Resolution worker started');
+
+// Graceful shutdown
+const shutdown = async (signal: string) => {
+  logger.info({ signal }, 'Shutting down oracle service');
+  await worker.close();
+  await app.close();
+  process.exit(0);
+};
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Start server
 const start = async () => {
   try {
     await app.listen({ port: config.port, host: '0.0.0.0' });
-    logger.info(`🚀 TrendZap Oracle running on port ${config.port}`);
+    logger.info(`TrendZap Oracle running on port ${config.port}`);
   } catch (err) {
     logger.error(err);
     process.exit(1);

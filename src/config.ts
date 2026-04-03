@@ -48,6 +48,14 @@ export const config = {
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),
 
+  // Blockchain / On-chain resolution
+  oracle: {
+    privateKey: process.env.ORACLE_PRIVATE_KEY || '0x',
+    marketContractAddress: process.env.MARKET_CONTRACT_ADDRESS || '',
+    rpcUrl: process.env.AVALANCHE_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc',
+    chainId: parseInt(process.env.CHAIN_ID || '43113', 10),
+  },
+
   // Validation
   minConfidenceScore: parseFloat(process.env.MIN_CONFIDENCE_SCORE || '0.8'),
   maxMetricAge: parseInt(process.env.MAX_METRIC_AGE_SECONDS || '300', 10),
