@@ -11,18 +11,76 @@
  * 4. Emit RESOLVED event to Redis pub/sub for frontend fanout
  */
 
-import { createPublicClient, createWalletClient, http, parseAbi } from 'viem';
+import { createPublicClient, createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { avalanche, avalancheFuji } from 'viem/chains';
 import { logger } from '../utils/logger';
 import { config } from '../config';
 
-// ABI for the resolution function only (minimal for security)
-const MARKET_ABI = parseAbi([
-  'function resolveMarket(uint256 marketId, uint256 metricValue) external',
-  'function getMarket(uint256 marketId) external view returns ((tuple(string postUrl, uint8 platform, uint8 metricType, uint256 threshold, uint256 startTime, uint256 endTime, uint256 resolutionTime) params, tuple(uint256 qOver, uint256 qUnder, uint256 b, uint256 totalVolume, uint256 feesCollected, uint256 poolBalance) state, uint8 status, uint8 outcome, uint256 resolvedValue, address creator, uint256 createdAt, uint256 resolvedAt))',
-  'function nextMarketId() external view returns (uint256)',
-]);
+// JSON ABI — abitype human-readable parser does not support named tuple members
+const MARKET_ABI = [
+  {
+    type: 'function',
+    name: 'resolveMarket',
+    inputs: [
+      { name: 'marketId', type: 'uint256' },
+      { name: 'metricValue', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'getMarket',
+    inputs: [{ name: 'marketId', type: 'uint256' }],
+    outputs: [
+      {
+        type: 'tuple',
+        components: [
+          {
+            name: 'params',
+            type: 'tuple',
+            components: [
+              { name: 'postUrl', type: 'string' },
+              { name: 'platform', type: 'uint8' },
+              { name: 'metricType', type: 'uint8' },
+              { name: 'threshold', type: 'uint256' },
+              { name: 'startTime', type: 'uint256' },
+              { name: 'endTime', type: 'uint256' },
+              { name: 'resolutionTime', type: 'uint256' },
+            ],
+          },
+          {
+            name: 'state',
+            type: 'tuple',
+            components: [
+              { name: 'qOver', type: 'uint256' },
+              { name: 'qUnder', type: 'uint256' },
+              { name: 'b', type: 'uint256' },
+              { name: 'totalVolume', type: 'uint256' },
+              { name: 'feesCollected', type: 'uint256' },
+              { name: 'poolBalance', type: 'uint256' },
+            ],
+          },
+          { name: 'status', type: 'uint8' },
+          { name: 'outcome', type: 'uint8' },
+          { name: 'resolvedValue', type: 'uint256' },
+          { name: 'creator', type: 'address' },
+          { name: 'createdAt', type: 'uint256' },
+          { name: 'resolvedAt', type: 'uint256' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'nextMarketId',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+] as const;
 
 export interface ResolutionResult {
   marketId: number;
