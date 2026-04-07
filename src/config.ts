@@ -50,10 +50,11 @@ export const config = {
 
   // Blockchain / On-chain resolution
   oracle: {
-    privateKey: process.env.ORACLE_PRIVATE_KEY || '0x',
+    // Ensure private key has 0x prefix — viem requires it
+    privateKey: (() => { const k = process.env.ORACLE_PRIVATE_KEY || ''; return k.startsWith('0x') ? k : `0x${k}`; })() as `0x${string}`,
     marketContractAddress: process.env.MARKET_CONTRACT_ADDRESS || '',
-    rpcUrl: process.env.AVALANCHE_RPC_URL || 'https://api.avax-test.network/ext/bc/C/rpc',
-    chainId: parseInt(process.env.CHAIN_ID || '43113', 10),
+    rpcUrl: process.env.AVALANCHE_RPC_URL || 'https://api.avax.network/ext/bc/C/rpc',
+    chainId: parseInt(process.env.CHAIN_ID || '43114', 10),
   },
 
   // Validation

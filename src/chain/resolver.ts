@@ -119,13 +119,13 @@ export async function resolveMarketOnChain(
 
   const publicClient = createPublicClient({
     chain,
-    transport: http(config.oracle?.rpcUrl || 'https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(config.oracle?.rpcUrl || 'https://api.avax.network/ext/bc/C/rpc'),
   });
 
   const walletClient = createWalletClient({
     account,
     chain,
-    transport: http(config.oracle?.rpcUrl || 'https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(config.oracle?.rpcUrl || 'https://api.avax.network/ext/bc/C/rpc'),
   });
 
   logger.info({
@@ -212,7 +212,7 @@ export async function isMarketResolvable(marketId: number): Promise<{
   const chain = config.oracle?.chainId === 43114 ? avalanche : avalancheFuji;
   const publicClient = createPublicClient({
     chain,
-    transport: http(config.oracle?.rpcUrl || 'https://api.avax-test.network/ext/bc/C/rpc'),
+    transport: http(config.oracle?.rpcUrl || 'https://api.avax.network/ext/bc/C/rpc'),
   });
 
   try {
