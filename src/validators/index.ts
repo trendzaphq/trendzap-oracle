@@ -55,11 +55,20 @@ async function checkForBotActivity(raw: RawMetrics): Promise<number> {
   let score = 0;
   const signals: string[] = [];
 
-  const likes = Number(d.like_count ?? d.likeCount ?? 0);
-  const views = Number(d.impression_count ?? d.viewCount ?? d.view_count ?? 0);
-  const comments = Number(d.reply_count ?? d.commentCount ?? d.comment_count ?? 0);
-  const shares = Number(d.retweet_count ?? d.shareCount ?? d.share_count ?? 0);
-  const followers = Number(d.author_followers ?? d.followerCount ?? 0);
+  // Flatten nested rawData structures from different collectors:
+  // Twitter: rawData.metrics.{ like_count, impression_count, retweet_count, reply_count }
+  // YouTube: rawData.statistics.{ likeCount, viewCount, commentCount }
+  // TikTok/Instagram: flat rawData fields
+  const m = (d.metrics ?? d.statistics ?? d) as Record<string, unknown>;
+
+  const likes = Number(m.like_count ?? m.likeCount ?? 0);
+  const views = Number(m.impression_count ?? m.viewCount ?? m.view_count ?? 0);
+  const comments = Number(m.reply_count ?? m.commentCount ?? m.comment_count ?? 0);
+  const shares = Number(m.retweet_count ?? m.shareCount ?? m.share_count ?? 0);
+  // author followers may be on tweet.author_public_metrics or flat
+  const tweetAuthor = (d.tweet as Record<string, unknown> | undefined);
+  const authorMetrics = tweetAuthor?.author_public_metrics as Record<string, unknown> | undefined;
+  const followers = Number(authorMetrics?.followers_count ?? d.author_followers ?? d.followerCount ?? 0);
 
   // Like-to-view ratio check (organic: 0.2%–15%)
   if (views > 1000 && likes > 0) {
