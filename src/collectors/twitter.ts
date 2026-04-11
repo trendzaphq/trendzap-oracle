@@ -50,7 +50,11 @@ export class TwitterCollector {
       throw new Error(`Unsupported metric: ${metric}`);
     }
 
-    const value = metrics[metricKey] || 0;
+    const value = metrics[metricKey];
+
+    if (value == null) {
+      throw new Error(`Metric "${metric}" (${metricKey}) not available for this tweet`);
+    }
 
     return {
       postId: tweetId,
