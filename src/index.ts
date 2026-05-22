@@ -42,6 +42,15 @@ const shutdown = async (signal: string) => {
 };
 process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
+process.on('uncaughtException', (err) => {
+  logger.error({ err: err.message, stack: err.stack }, 'Uncaught exception');
+  shutdown('uncaughtException').catch(() => process.exit(1));
+});
+process.on('unhandledRejection', (reason) => {
+  const msg = reason instanceof Error ? reason.message : String(reason);
+  logger.error({ reason: msg }, 'Unhandled promise rejection');
+  shutdown('unhandledRejection').catch(() => process.exit(1));
+});
 
 // Start server
 const start = async () => {

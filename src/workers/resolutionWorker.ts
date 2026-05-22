@@ -31,6 +31,19 @@ export interface ResolutionJobData {
 const redisConnection = new IORedis(config.redisUrl, {
   maxRetriesPerRequest: null, // required by BullMQ
   enableReadyCheck: false,
+  retryStrategy: (times: number) => {
+    const delay = Math.min(times * 500, 10_000); // cap at 10s
+    logger.warn({ times, delayMs: delay }, 'Redis reconnecting');
+    return delay;
+  },
+  reconnectOnError: () => true, // always attempt reconnect on stream errors
+});
+
+redisConnection.on('error', (err) => {
+  logger.error({ err: err.message }, 'Redis connection error — will retry');
+});
+redisConnection.on('reconnecting', () => {
+  logger.warn('Redis reconnecting...');
 });
 
 // Queue — producers add jobs here (e.g. the metrics API route when a new market
