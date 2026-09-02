@@ -66,7 +66,7 @@ export class InstagramCollector {
       throw new Error(`Instagram Graph API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as Record<string, number | string | undefined>;
 
     const metricMap: Record<string, string> = {
       likes: 'like_count',
@@ -78,7 +78,7 @@ export class InstagramCollector {
       throw new Error(`Unsupported metric for Instagram: ${metric}`);
     }
 
-    const value = data[metricKey] ?? 0;
+    const value = Number(data[metricKey] ?? 0);
 
     return {
       postId,
@@ -105,7 +105,7 @@ export class InstagramCollector {
       throw new Error(`Failed to resolve media ID: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as { media_id?: string };
     // The oEmbed response includes media_id for Graph API lookups
     if (data.media_id) {
       return data.media_id;

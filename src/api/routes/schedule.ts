@@ -1,16 +1,26 @@
 /**
  * POST /api/v1/schedule
- * Called by the subgraph event watcher (or admin) when a new market is created.
+ * Called by the app (or an admin) when a new market is created.
  * Enqueues a BullMQ resolution job for when the market ends.
+ *
+ * Requires ORACLE_API_KEY. This endpoint was previously unauthenticated, and the
+ * worker resolved against the postUrl supplied here — so anyone able to reach the
+ * service could make a market settle on a post they controlled. The worker now reads
+ * the URL from the contract (see workers/resolutionWorker.ts), and this endpoint is
+ * authenticated as well.
+ *
+ * `postUrl` is retained only for logging and mismatch detection; it is not used to
+ * decide what a market resolves against.
  */
 
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { scheduleResolution } from '../../workers/resolutionWorker';
 import { logger } from '../../utils/logger';
+import { requireApiKey } from '../auth';
 
 const ScheduleBody = z.object({
-  marketId: z.number().int().positive(),
+  marketId: z.number().int().nonnegative(),
   postUrl: z.string().url(),
   platform: z.enum(['twitter', 'tiktok', 'instagram', 'youtube']),
   metricType: z.string().min(1),
@@ -20,6 +30,7 @@ const ScheduleBody = z.object({
 
 export async function scheduleRoutes(app: FastifyInstance) {
   app.post('/schedule', {
+    preHandler: requireApiKey,
     schema: {
       body: {
         type: 'object',

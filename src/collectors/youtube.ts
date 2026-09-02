@@ -27,13 +27,18 @@ export class YouTubeCollector {
       throw new Error(`YouTube API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      items?: Array<{ statistics?: Record<string, string> }>;
+    };
 
     if (!data.items || data.items.length === 0) {
       throw new Error('Video not found');
     }
 
     const statistics = data.items[0].statistics;
+    if (!statistics) {
+      throw new Error('Video statistics not available (may be private or removed)');
+    }
 
     // Map metric type to YouTube statistics field
     const metricMap: Record<string, string> = {

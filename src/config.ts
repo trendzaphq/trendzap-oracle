@@ -44,6 +44,22 @@ export const config = {
     externalInitiatorSecret: process.env.CHAINLINK_EXTERNAL_INITIATOR_SECRET || '',
   },
 
+  /**
+   * Shared secret for the oracle's privileged endpoints (/schedule).
+   * Previously declared in docker-compose.yml but never read anywhere in the service.
+   */
+  apiKey: process.env.ORACLE_API_KEY || '',
+
+  /**
+   * Browser origins permitted to call this service, comma-separated.
+   * Empty disables cross-origin browser access entirely (server-to-server is
+   * unaffected), which is the safe default for a service that resolves markets.
+   */
+  allowedOrigins: (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean),
+
   // Rate Limiting
   rateLimitMax: parseInt(process.env.RATE_LIMIT_MAX || '100', 10),
   rateLimitWindow: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '60000', 10),

@@ -13,9 +13,12 @@ const app = Fastify({
   logger: logger as any,
 });
 
-// Register plugins
+// Register plugins.
+//
+// `origin: true` reflected whatever Origin was sent, which is effectively open.
+// Restrict to the configured app origins instead.
 await app.register(cors, {
-  origin: true,
+  origin: config.allowedOrigins.length > 0 ? config.allowedOrigins : false,
 });
 
 await app.register(rateLimit, {

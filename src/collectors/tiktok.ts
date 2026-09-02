@@ -79,7 +79,9 @@ export class TikTokCollector {
       throw new Error(`TikTok Research API error ${response.status}: ${text}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      data?: { videos?: Array<Record<string, unknown>> };
+    };
     const video = data?.data?.videos?.[0];
 
     if (!video) {
@@ -98,7 +100,10 @@ export class TikTokCollector {
       throw new Error(`Unsupported metric for TikTok: ${metric}`);
     }
 
-    const value = video[metricKey] ?? 0;
+    const value = Number(video[metricKey] ?? 0);
+    if (!Number.isFinite(value)) {
+      throw new Error(`TikTok returned a non-numeric ${metric} value`);
+    }
 
     return {
       postId: videoId,
@@ -191,7 +196,9 @@ export class TikTokCollector {
       throw new Error(`TikTok web API error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      itemInfo?: { itemStruct?: { stats?: Record<string, number> } };
+    };
     const stats = data?.itemInfo?.itemStruct?.stats;
 
     if (!stats) {
@@ -239,7 +246,10 @@ export class TikTokCollector {
       throw new Error(`TikTok OAuth error: ${response.status}`);
     }
 
-    const data = await response.json();
+    const data = (await response.json()) as {
+      access_token: string;
+      expires_in: number;
+    };
     this.accessToken = data.access_token;
     // Expire 5 minutes early to avoid edge cases
     this.tokenExpiry = Date.now() + (data.expires_in - 300) * 1000;

@@ -6,7 +6,8 @@
  * 
  * Flow:
  * 1. BullMQ job fires when market.resolutionTime is reached
- * 2. Aggregate metrics from ≥2 sources, validate within 5% margin
+ * 2. Collect the metric for the post URL recorded ON-CHAIN, and validate it
+ *    (bot + anomaly heuristics) before accepting the value
  * 3. Sign and submit resolution transaction on-chain
  * 4. Emit RESOLVED event to Redis pub/sub for frontend fanout
  */
@@ -203,6 +204,12 @@ export async function isMarketResolvable(marketId: number): Promise<{
   resolvable: boolean;
   reason?: string;
   threshold?: bigint;
+  /**
+   * The post URL recorded on-chain for this market. The worker resolves against this,
+   * never against a URL supplied by the caller of /api/v1/schedule — otherwise anyone
+   * able to enqueue a job could point resolution at a post they control.
+   */
+  postUrl?: string;
 }> {
   const contractAddress = config.oracle?.marketContractAddress as `0x${string}`;
   if (!contractAddress) {
@@ -227,6 +234,7 @@ export async function isMarketResolvable(marketId: number): Promise<{
     const status = market.status as number;
     const endTime = market.params.endTime as bigint;
     const threshold = market.params.threshold as bigint;
+    const postUrl = market.params.postUrl as string;
 
     // Status enum: 0=PENDING, 1=ACTIVE, 2=CLOSED, 3=RESOLVED, 4=CANCELLED, 5=DISPUTED
     if (status === 3) return { resolvable: false, reason: 'Already resolved' };
@@ -238,7 +246,7 @@ export async function isMarketResolvable(marketId: number): Promise<{
       return { resolvable: false, reason: `End time not reached (${Number(endTime - now)}s remaining)` };
     }
 
-    return { resolvable: true, threshold };
+    return { resolvable: true, threshold, postUrl };
   } catch (err) {
     return {
       resolvable: false,

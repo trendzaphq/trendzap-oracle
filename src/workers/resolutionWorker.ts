@@ -10,7 +10,7 @@
  * 4. On failure it retries with exponential backoff (max 5 attempts).
  */
 
-import { Queue, Worker, Job } from 'bullmq';
+import { Queue, Worker, Job, DelayedError } from 'bullmq';
 import IORedis from 'ioredis';
 import { config } from '../config';
 import { getMetrics } from '../collectors';
@@ -87,7 +87,7 @@ export function createResolutionWorker(): Worker<ResolutionJobData> {
   const worker = new Worker<ResolutionJobData>(
     'market-resolution',
     async (job: Job<ResolutionJobData>) => {
-      const { marketId, postUrl, platform, metricType, threshold } = job.data;
+      const { marketId, platform, metricType, threshold } = job.data;
 
       logger.info({ marketId, attempt: job.attemptsMade + 1 }, 'Processing market resolution job');
 
@@ -99,17 +99,39 @@ export function createResolutionWorker(): Worker<ResolutionJobData> {
           logger.info({ marketId, reason: resolvable.reason }, 'Market already settled — skipping');
           return;
         }
-        // Not at end time yet — reschedule 30s from now
+        // Not at end time yet — defer THIS job rather than adding a new one.
+        //
+        // Calling scheduleResolution() here used to be a silent no-op: the running job
+        // still held jobId `market-resolve-<id>`, so BullMQ discarded the add as a
+        // duplicate and the `return` then marked the job completed. The market was
+        // dropped with no retry, no failure and no trace.
         if (resolvable.reason?.includes('End time not reached')) {
-          logger.warn({ marketId, reason: resolvable.reason }, 'End time not reached yet — rescheduling');
-          await scheduleResolution({ ...job.data, resolutionTime: job.data.resolutionTime + 30 });
-          return;
+          logger.warn({ marketId, reason: resolvable.reason }, 'End time not reached yet — deferring');
+          await job.moveToDelayed(Date.now() + 30_000, job.token);
+          // Signals to BullMQ that this job was deferred, not completed.
+          throw new DelayedError();
         }
         throw new Error(`Market not resolvable: ${resolvable.reason}`);
       }
 
-      // 2. Collect metrics from the social platform
-      const rawMetrics = await getMetrics(postUrl, platform, metricType);
+      // 2. Collect metrics for the post URL recorded ON-CHAIN.
+      //
+      // The job payload also carries a postUrl, but it arrives over an HTTP endpoint
+      // and is not authoritative: resolving against it would let whoever enqueued the
+      // job choose which post the market settles on. The contract is the only source
+      // of truth for what a market is about.
+      const onChainUrl = resolvable.postUrl;
+      if (!onChainUrl) {
+        throw new Error('Market has no on-chain postUrl — refusing to resolve');
+      }
+      if (job.data.postUrl && job.data.postUrl !== onChainUrl) {
+        logger.warn(
+          { marketId, jobUrl: job.data.postUrl, onChainUrl },
+          'Scheduled postUrl does not match the on-chain URL — using the on-chain URL',
+        );
+      }
+
+      const rawMetrics = await getMetrics(onChainUrl, platform, metricType);
 
       // 3. Validate — check for bots & anomalies
       const validated = await validateMetrics(rawMetrics);
