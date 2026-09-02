@@ -10,31 +10,57 @@ export interface ValidatedMetrics {
   warnings: string[];
 }
 
+/**
+ * Score a collected metric for trustworthiness.
+ *
+ * The penalties are scaled to the detector scores rather than applied as flat
+ * constants. Previously a bot signal cost a flat 0.20 and an anomaly signal 0.15
+ * against a 0.8 threshold, which meant `1.0 - 0.20 = 0.80 >= 0.80` still passed:
+ * no single check could ever fail a resolution, and the anomaly detector could not
+ * fail one even in principle. A strongly-flagged metric now falls below the
+ * threshold on its own.
+ */
 export async function validateMetrics(raw: RawMetrics): Promise<ValidatedMetrics> {
   const warnings: string[] = [];
   let confidence = 1.0;
 
-  // Run validation checks
   const botScore = await checkForBotActivity(raw);
   if (botScore > 0.5) {
-    confidence -= 0.2;
-    warnings.push('Potential bot activity detected');
+    // 0.5 → -0.20, 1.0 → -0.50
+    confidence -= 0.2 + (botScore - 0.5) * 0.6;
+    warnings.push(`Potential bot activity detected (score ${botScore.toFixed(2)})`);
   }
 
   const anomalyScore = await checkForAnomalies(raw);
   if (anomalyScore > 0.5) {
-    confidence -= 0.15;
-    warnings.push('Unusual metric pattern detected');
+    // 0.5 → -0.20, 1.0 → -0.50
+    confidence -= 0.2 + (anomalyScore - 0.5) * 0.6;
+    warnings.push(`Unusual metric pattern detected (score ${anomalyScore.toFixed(2)})`);
   }
 
-  // Ensure minimum confidence threshold
+  // Metrics older than maxMetricAge are not trusted for resolution. This bound was
+  // configured (MAX_METRIC_AGE_SECONDS) but never enforced.
+  const fetchedAt = raw.rawData?.fetchedAt;
+  if (typeof fetchedAt === 'string') {
+    const ageSeconds = (Date.now() - new Date(fetchedAt).getTime()) / 1000;
+    if (Number.isFinite(ageSeconds) && ageSeconds > config.maxMetricAge) {
+      confidence -= 0.3;
+      warnings.push(`Metric is stale (${Math.round(ageSeconds)}s > ${config.maxMetricAge}s)`);
+    }
+  }
+
+  confidence = Math.max(0, confidence);
+
   if (confidence < config.minConfidenceScore) {
-    logger.warn({ raw, confidence }, 'Metrics below confidence threshold');
+    logger.warn({ raw, confidence, warnings }, 'Metrics below confidence threshold');
   }
 
   return {
     value: raw.value,
-    confidence: Math.max(0, confidence),
+    confidence,
+    // Single-source: the collectors query one platform API per market. The service
+    // header used to claim ≥2-source aggregation with a 5% agreement margin; no such
+    // aggregation exists, so this reports what is actually true.
     sources: [`${raw.platform}_api`],
     isValid: confidence >= config.minConfidenceScore,
     warnings,
